@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables (contains API key — NEVER commit this)
+.env
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Markitdown converted output (generated at runtime)
+files/*.md
+
+# Generated reports (changelog / viability .md files) — keep the folder, ignore contents
+outputs/*
+!outputs/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
