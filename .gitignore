@@ -27,7 +27,7 @@ build/
 # Markitdown converted output (generated at runtime)
 files/*.md
 
-# Generated reports (changelog / viability .md files) — keep the folder, ignore contents
+# Generated reports (changelog / viability .html files) — keep the folder, ignore contents
 outputs/*
 !outputs/.gitkeep
 

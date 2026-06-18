@@ -1,5 +1,6 @@
 from openai import OpenAI
-from datetime import datetime
+import json
+import re
 import logging
 
 from core.adr_parser import format_adrs_for_prompt
@@ -13,75 +14,72 @@ def connect(api_key: str) -> OpenAI:
     return OpenAI(api_key=api_key)
 
 
-def assess_viability(client: OpenAI, improvement: str, adrs: dict) -> str:
+def _extract_json(content: str) -> dict:
+    md_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
+    if md_match:
+        return json.loads(md_match.group(1))
+
+    match = re.search(r"\{.*\}", content, re.DOTALL)
+    if not match:
+        raise ValueError("Nenhum JSON encontrado na resposta da IA")
+    return json.loads(match.group(0))
+
+
+def assess_viability(client: OpenAI, improvement: str, adrs: dict) -> dict:
     formatted_adrs = format_adrs_for_prompt(adrs)
-    generated_at = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
     prompt = f"""
-        Você é um arquiteto de software sênior especializado em Architecture Decision Records (ADRs)
-        e arquitetura evolutiva.
+      Você é um arquiteto de software sênior especializado em Architecture Decision Records (ADRs)
+      e arquitetura evolutiva.
 
-        ## Tarefa
-        Analise o impacto da seguinte melhoria futura proposta sobre as ADRs existentes do
-        sistema SARC (Sistema de Auxílio para Representantes Comerciais):
+      ## Tarefa
+      Analise o impacto da seguinte melhoria futura proposta sobre as ADRs existentes do
+      sistema SARC (Sistema de Auxílio para Representantes Comerciais):
 
-        **Melhoria Proposta:** {improvement}
+      **Melhoria Proposta:** {improvement}
 
-        ## ADRs do Sistema SARC
-        {formatted_adrs}
+      ## ADRs do Sistema SARC
+      {formatted_adrs}
 
-        ## Instruções de Análise
-        Para CADA ADR listada acima:
-        1. Considere seu Contexto, Decisão, Status e Consequências
-        2. Raciocine sobre como "{improvement}" interage com a ADR
-        3. Classifique usando exatamente um destes rótulos: "Precisa de revisão",
-        "Continua válida" ou "Pode se tornar obsoleta"
-        4. Escreva uma justificativa concisa (2-3 frases)
-        5. Escreva uma ação recomendada (1-2 frases)
+      ## Instruções de Análise
+      Para CADA ADR listada acima, você DEVE:
 
-        Identifique também quaisquer novas ADRs que precisariam ser criadas para suportar a melhoria.
+      1. Considerar seu Contexto, Decisão, Status e Consequências
+      2. Raciocinar sobre como "{improvement}" interage com a ADR
+      3. Classificar usando exatamente um destes valores:
+        - "precisa_revisao": a melhoria conflita diretamente ou altera significativamente esta decisão
+        - "continua_valida": a melhoria não afeta esta ADR — ela permanece totalmente aplicável
+        - "pode_se_tornar_obsoleta": a melhoria tornaria esta ADR não mais relevante
+      4. Escrever uma justificativa concisa (2-3 frases)
+      5. Escrever uma ação recomendada (1-2 frases)
 
-        ## Formato de Saída
-        Retorne APENAS um documento Markdown seguindo EXATAMENTE este modelo, sem blocos de código
-        e sem nenhum texto fora do modelo:
+      Identifique também quaisquer novas ADRs que precisariam ser criadas para suportar a melhoria.
 
-        # Avaliação de Viabilidade de Melhoria Futura — SARC
-
-        **Melhoria avaliada:** {improvement}
-        **Gerado em:** {generated_at}
-
-        ## Resumo Executivo
-
-        <resumo de 3-5 frases sobre o impacto geral da melhoria nas ADRs>
-
-        ## Visão Geral
-
-        | Métrica | Valor |
-        |---------|-------|
-        | Total de ADRs analisadas | <inteiro> |
-        | Precisam de revisão | <inteiro> |
-        | Continuam válidas | <inteiro> |
-        | Podem se tornar obsoletas | <inteiro> |
-
-        ## Análise por ADR
-
-        ### ADR-XX: <título da ADR>
-
-        **Classificação:** <Precisa de revisão | Continua válida | Pode se tornar obsoleta>
-
-        **Justificativa:** <justificativa em 2-3 frases>
-
-        **Ação recomendada:** <ação em 1-2 frases>
-
-        (repita o bloco "### ADR-XX" para cada ADR analisada)
-
-        ## Novas ADRs Sugeridas
-
-        ### <título da nova ADR>
-
-        <justificativa de por que esta nova ADR é necessária>
-
-        (repita para cada nova ADR; se nenhuma for necessária, escreva apenas: "Nenhuma nova ADR é necessária.")
+      ## Formato de Saída
+      Retorne APENAS JSON válido com exatamente esta estrutura — sem markdown, sem explicações:
+      {{
+        "melhoria": "<o texto da melhoria>",
+        "analise": [
+          {{
+            "id_adr": "<ADR-XX>",
+            "titulo": "<título da ADR>",
+            "classificacao": "<precisa_revisao|continua_valida|pode_se_tornar_obsoleta>",
+            "justificativa": "<justificativa em 2-3 frases>",
+            "acao_recomendada": "<ação em 1-2 frases>"
+          }}
+        ],
+        "novas_adrs_sugeridas": [
+          {{
+            "titulo": "<título da ADR sugerida>",
+            "justificativa": "<por que esta nova ADR é necessária>"
+          }}
+        ],
+        "resumo_executivo": "<resumo de 3-5 frases sobre o impacto geral>",
+        "total_adrs_analisadas": <inteiro>,
+        "quantidade_revisao": <inteiro>,
+        "quantidade_validas": <inteiro>,
+        "quantidade_obsoletas": <inteiro>
+      }}
     """
 
     logger.info(f"Chamando IA para avaliar viabilidade: {improvement[:50]}...")
@@ -90,4 +88,4 @@ def assess_viability(client: OpenAI, improvement: str, adrs: dict) -> str:
         messages=[{"role": "user", "content": prompt}]
     )
 
-    return response.choices[0].message.content.strip()
+    return _extract_json(response.choices[0].message.content)

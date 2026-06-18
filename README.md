@@ -1,57 +1,55 @@
 # SARC ADR Tools — Ferramentas MCP para Arquitetura de Software
 
-Servidor MCP com duas ferramentas de inteligência artificial para análise e versionamento de Architecture Decision Records (ADRs) do sistema SARC (Sistema de Análise de Requisitos e Contratos).
+Servidor MCP com duas ferramentas para análise e versionamento de Architecture Decision Records (ADRs) do sistema SARC (Sistema de Auxílio para Representantes Comerciais). Cada ferramenta gera um **relatório HTML estilizado** que é **aberto automaticamente no navegador**.
 
 ## Ferramentas Disponíveis
 
 ### 1. Avaliador de Viabilidade de Melhorias Futuras (`avaliar_viabilidade_melhoria`)
 
-Recebe uma melhoria futura proposta (ex: "migrar para SPA com React") e usa IA para analisar o impacto sobre cada ADR do documento de arquitetura do SARC, indicando:
+Recebe uma melhoria futura proposta (ex: "migrar para SPA com React") e o caminho do PDF do documento de arquitetura, e usa **IA** para analisar o impacto sobre cada ADR do SARC, indicando:
 
 - Quais ADRs precisam ser revisadas
 - Quais continuam válidas sem alteração
 - Quais podem se tornar obsoletas
 - Se novas ADRs precisam ser criadas para suportar a mudança
 
-**Parâmetro:**
+**Parâmetros:**
 | Nome | Tipo | Descrição |
 |------|------|-----------|
 | `improvement` | `string` | Descrição da melhoria futura a ser avaliada |
+| `pdf_path` | `string` | Caminho do PDF do documento de arquitetura |
 
-**Exemplos de uso:**
-- `"migrar para SPA com React"`
-- `"adicionar cache para relatórios"`
-- `"backup em nuvem"`
+**Exemplos de melhoria:** `"migrar para SPA com React"`, `"adicionar cache para relatórios"`, `"backup em nuvem"`
 
 ---
 
 ### 2. Gerador de Changelog de ADRs (`gerar_changelog_adr`)
 
-Recebe duas versões de um ADR (texto antigo e texto novo) e gera um changelog estruturado com as diferenças por seção (Contexto, Decisão, Status, Consequências), classificando cada mudança como:
+Recebe os caminhos de **dois PDFs** do documento de arquitetura (versão antiga e versão nova), converte ambos para Markdown, casa as ADRs por identificador e gera um changelog visual com as diferenças por seção (Contexto, Decisão, Status, Consequências), classificando cada mudança como:
 
-- **adição**: conteúdo novo que não existia antes
-- **remoção**: conteúdo que foi removido
-- **modificação**: conteúdo que existia e foi alterado
+- 🟢 **adição**: conteúdo novo que não existia antes
+- 🔴 **remoção**: conteúdo que foi removido
+- 🟡 **modificação**: conteúdo que existia e foi alterado
+
+Detecta ainda ADRs **adicionadas** ou **removidas** entre as duas versões. Esta ferramenta **não usa IA** — o diff é determinístico (biblioteca `difflib`).
 
 **Parâmetros:**
 | Nome | Tipo | Descrição |
 |------|------|-----------|
-| `old_version` | `string` | Texto completo da versão antiga do ADR |
-| `new_version` | `string` | Texto completo da versão nova do ADR |
+| `old_pdf_path` | `string` | Caminho do PDF da versão antiga do documento |
+| `new_pdf_path` | `string` | Caminho do PDF da versão nova do documento |
 
 ---
 
 ## Pré-requisitos
 
 - Python 3.11 ou superior
-- Chave de API da OpenAI (modelo `gpt-4.1-mini`)
-- PDF do documento de arquitetura do SARC
+- Chave de API da OpenAI (modelo `gpt-4.1-mini`) — necessária apenas para a Ferramenta 1
+- PDF(s) do documento de arquitetura do SARC
 
 ## Instalação
 
-**1. Clone ou baixe o projeto**
-
-**2. Crie e ative um ambiente virtual**
+**1. Crie e ative um ambiente virtual**
 
 ```bash
 # Windows
@@ -63,13 +61,13 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-**3. Instale as dependências**
+**2. Instale as dependências**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-**4. Configure as variáveis de ambiente**
+**3. Configure as variáveis de ambiente**
 
 ```bash
 # Windows
@@ -79,19 +77,21 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-Abra o arquivo `.env` e preencha sua chave:
+Abra o `.env` e preencha sua chave:
 
 ```
 OPENAI_API_KEY=sk-...
 ```
 
-**5. Adicione o PDF do documento de arquitetura**
+**4. Adicione o(s) PDF(s) do documento de arquitetura**
 
-Coloque o arquivo PDF na pasta `files/`:
+Coloque o PDF na pasta `files/`:
 
 ```
 files/documento_arquitetura_sarc.pdf
 ```
+
+Para a Ferramenta 2, você precisa de **duas versões** do documento (ex.: `documento_arquitetura_sarc.pdf` e uma versão editada `documento_arquitetura_sarc_v2.pdf`).
 
 ## Uso
 
@@ -101,20 +101,24 @@ files/documento_arquitetura_sarc.pdf
 python server.py
 ```
 
-O servidor ficará aguardando conexões de clientes MCP via stdin/stdout.
+O servidor fica aguardando conexões de clientes MCP via stdin/stdout.
 
-### Executar o cliente de demonstração
-
-O cliente executa automaticamente as duas ferramentas com exemplos pré-configurados:
+### Executar o cliente interativo
 
 ```bash
 python client.py
 ```
 
-O cliente irá:
-1. Conectar ao servidor MCP via subprocess
-2. Executar a **Ferramenta 1** avaliando a melhoria "adicionar cache para relatórios"
-3. Executar a **Ferramenta 2** gerando o changelog entre duas versões da ADR-03
+O cliente exibe um menu para escolher a ferramenta:
+
+```
+  1 — Avaliador de Viabilidade de Melhorias Futuras (usa IA)
+  2 — Gerador de Changelog de ADRs (diff sem IA)
+  0 — Sair
+```
+
+- **Opção 1**: digite a melhoria e o caminho do PDF. Um agente de IA aciona a ferramenta MCP e resume o resultado no terminal; o relatório HTML abre no navegador.
+- **Opção 2**: informe o caminho do PDF antigo e do PDF novo. O changelog é gerado e o HTML abre no navegador.
 
 ---
 
@@ -124,28 +128,29 @@ O cliente irá:
 mcp-arquitetura-de-software/
 ├── core/
 │   ├── adr_parser.py      # Extração de ADRs do markdown
-│   ├── llm.py             # Cliente OpenAI e funções de prompt
+│   ├── llm.py             # Cliente OpenAI e prompt da Ferramenta 1
 │   ├── pdf_converter.py   # Conversão PDF → Markdown (markitdown)
-│   └── report_writer.py   # Geração dos relatórios .md em outputs/
+│   ├── html_template.py   # Template HTML + CSS dos relatórios
+│   └── report_writer.py   # Renderização e gravação dos relatórios HTML
 ├── tools/
 │   ├── viability.py       # Orquestração da Ferramenta 1
 │   └── changelog.py       # Orquestração da Ferramenta 2
 ├── files/
-│   └── documento_arquitetura_sarc.pdf   ← coloque o PDF aqui
-├── outputs/               # Relatórios .md gerados (criado automaticamente)
+│   └── documento_arquitetura_sarc.pdf   ← coloque o(s) PDF(s) aqui
+├── outputs/               # Relatórios .html gerados (criado automaticamente)
 ├── server.py              # Servidor MCP (FastMCP)
-├── client.py              # Cliente MCP de demonstração
+├── client.py              # Cliente MCP interativo
 ├── .env.example           # Template de configuração
 └── requirements.txt       # Dependências
 ```
 
-> As duas ferramentas gravam um relatório formatado em `outputs/` (um `.md` por
-> execução) e retornam o caminho do arquivo. A Ferramenta 1 também retorna o JSON
-> estruturado para o agente de IA resumir no terminal.
+> As duas ferramentas gravam um relatório HTML em `outputs/`, abrem-no no navegador
+> e retornam o caminho do arquivo. A Ferramenta 1 também retorna o JSON estruturado
+> para o agente de IA resumir no terminal.
 
 ## Relação com as ADRs do SARC
 
 | Ferramenta | Relação com as ADRs |
 |------------|---------------------|
-| **Avaliador de Viabilidade** | Lê todas as ADRs do documento de arquitetura e avalia o impacto de cada melhoria futura listada no documento, apoiando a tomada de decisão sobre quais ADRs revisitar |
-| **Gerador de Changelog** | Rastreia a evolução de ADRs individuais ao longo do tempo, facilitando a auditoria de mudanças nas decisões arquiteturais |
+| **Avaliador de Viabilidade** | Lê todas as ADRs do documento de arquitetura e avalia o impacto de cada melhoria futura listada no documento, apoiando a decisão sobre quais ADRs revisitar |
+| **Gerador de Changelog** | Compara duas versões do documento e rastreia a evolução das ADRs ao longo do tempo, facilitando a auditoria das mudanças nas decisões arquiteturais |

@@ -14,7 +14,6 @@ logging.basicConfig(
 load_dotenv()
 
 SERVER_NAME = "sarc-adr-tools"
-ARCHITECTURE_FILE = "files/documento_arquitetura_sarc.pdf"
 
 mcp = FastMCP(SERVER_NAME)
 logger = logging.getLogger(SERVER_NAME)
@@ -53,32 +52,33 @@ def server_info() -> dict:
     name="avaliar_viabilidade_melhoria",
     title="Avaliador de Viabilidade de Melhorias Futuras",
     description=(
-        "Recebe uma melhoria futura proposta para o sistema SARC e usa IA para analisar "
-        "o impacto sobre cada ADR existente, indicando quais decisões precisam ser revisadas, "
-        "quais continuam válidas, quais podem se tornar obsoletas e se novas ADRs são necessárias"
+        "Recebe uma melhoria futura proposta e o caminho do PDF do documento de arquitetura "
+        "do SARC, e usa IA para analisar o impacto sobre cada ADR existente, indicando quais "
+        "decisões precisam ser revisadas, quais continuam válidas, quais podem se tornar "
+        "obsoletas e se novas ADRs são necessárias. Gera um relatório HTML."
     )
 )
-def assess_improvement_viability(improvement: str) -> dict:
-    return run_viability_assessment(get_client(), improvement, ARCHITECTURE_FILE)
+def assess_improvement_viability(improvement: str, pdf_path: str) -> dict:
+    return run_viability_assessment(get_client(), improvement, pdf_path)
 
 
 @mcp.tool(
     name="gerar_changelog_adr",
     title="Gerador de Changelog de ADRs",
     description=(
-        "Recebe duas versões de um ADR (texto antigo e texto novo) e gera um changelog "
+        "Recebe os caminhos de dois PDFs do documento de arquitetura (versão antiga e versão "
+        "nova), converte ambos para markdown, casa as ADRs por identificador e gera um changelog "
         "estruturado com as diferenças por seção (Contexto, Decisão, Status, Consequências), "
-        "classificando cada mudança como adição, remoção ou modificação"
+        "classificando cada mudança como adição, remoção ou modificação. Gera um relatório HTML."
     )
 )
-def generate_adr_changelog(old_version: str, new_version: str) -> dict:
-    return run_changelog_generation(old_version, new_version)
+def generate_adr_changelog(old_pdf_path: str, new_pdf_path: str) -> dict:
+    return run_changelog_generation(old_pdf_path, new_pdf_path)
 
 
 if __name__ == "__main__":
     try:
         logger.info(f"Iniciando servidor MCP: {SERVER_NAME}")
-        logger.info(f"Documento de arquitetura: {ARCHITECTURE_FILE}")
         mcp.run()
     except Exception as e:
         logger.error(f"Erro ao iniciar servidor: {e}")

@@ -78,31 +78,16 @@ def _parse_single_adr(block: str) -> dict:
     }
 
 
-def parse_adr_sections(adr_text: str) -> dict[str, str]:
-    """Extract sections from a raw ADR text string (used by the changelog tool)."""
-    context_match = re.search(
-        _hdr("Contexto") + r"(.*?)(?=" + _hdr("Decis[aã]o") + r"|\Z)",
-        adr_text, re.DOTALL | re.IGNORECASE
-    )
-    decision_match = re.search(
-        _hdr("Decis[aã]o") + r"(.*?)(?="
-        + _hdr("Status") + r"|" + _hdr("Consequ[eê]ncias") + r"|\Z)",
-        adr_text, re.DOTALL | re.IGNORECASE
-    )
-    status_match = re.search(
-        _hdr("Status") + r"(.+?)(?=\n|$)",
-        adr_text, re.IGNORECASE
-    )
-    consequences_match = re.search(
-        _hdr("Consequ[eê]ncias") + r"(.*?)(?=\Z)",
-        adr_text, re.DOTALL | re.IGNORECASE
-    )
-
+def adr_to_sections(adr: dict | None) -> dict[str, str]:
+    # Converte um ADR já parseado em {Contexto, Decisão, Status, Consequências};
+    # ADR ausente (None) vira seções vazias — usado no diff do changelog.
+    if not adr:
+        return {section: "" for section in SECTIONS}
     return {
-        "Contexto": context_match.group(1).strip() if context_match else "",
-        "Decisão": decision_match.group(1).strip() if decision_match else "",
-        "Status": status_match.group(1).strip() if status_match else "",
-        "Consequências": consequences_match.group(1).strip() if consequences_match else "",
+        "Contexto": adr.get("contexto") or "",
+        "Decisão": adr.get("decisao") or "",
+        "Status": adr.get("status") or "",
+        "Consequências": adr.get("consequencias") or "",
     }
 
 

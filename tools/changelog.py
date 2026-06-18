@@ -3,9 +3,14 @@ import re
 import logging
 from datetime import datetime
 
-from core import parse_adr_sections, SECTIONS, write_changelog_report
+from core import convert_pdf_to_markdown, parse_all_adrs, adr_to_sections, SECTIONS, write_changelog_report
 
 logger = logging.getLogger(__name__)
+
+
+def _adr_number(adr_id: str) -> int:
+    match = re.search(r"\d+", adr_id)
+    return int(match.group()) if match else 0
 
 
 def _diff_section(section_name: str, old_text: str, new_text: str) -> dict:
@@ -38,49 +43,81 @@ def _diff_section(section_name: str, old_text: str, new_text: str) -> dict:
             "conteudo_novo": new_chunk,
         })
 
-    return {
-        "secao": section_name,
-        "possui_mudancas": True,
-        "mudancas": mudancas,
-    }
+    return {"secao": section_name, "possui_mudancas": True, "mudancas": mudancas}
 
 
-def run_changelog_generation(old_version: str, new_version: str) -> dict:
-    logger.info("Iniciando geração de changelog de ADR")
+def run_changelog_generation(old_pdf_path: str, new_pdf_path: str) -> dict:
+    logger.info(f"Iniciando changelog entre '{old_pdf_path}' e '{new_pdf_path}'")
 
-    old_sections = parse_adr_sections(old_version)
-    new_sections = parse_adr_sections(new_version)
+    old_adrs = parse_all_adrs(convert_pdf_to_markdown(old_pdf_path))
+    new_adrs = parse_all_adrs(convert_pdf_to_markdown(new_pdf_path))
 
-    id_match = re.search(r"(ADR-\d+)", new_version)
-    adr_id = id_match.group(1) if id_match else "ADR-DESCONHECIDA"
+    if not old_adrs and not new_adrs:
+        return {
+            "erro": "Nenhuma ADR encontrada nos documentos informados.",
+            "dica": "Verifique se os PDFs existem e contêm ADRs no formato esperado."
+        }
 
-    changelog = []
-    total_changes = 0
-    changes_by_type: dict[str, int] = {"adicao": 0, "remocao": 0, "modificacao": 0}
+    all_ids = sorted(set(old_adrs) | set(new_adrs), key=_adr_number)
 
-    for section in SECTIONS:
-        old_text = old_sections.get(section, "")
-        new_text = new_sections.get(section, "")
+    adrs_result = []
+    by_type = {"adicao": 0, "remocao": 0, "modificacao": 0}
+    totais = {"modificadas": 0, "adicionadas": 0, "removidas": 0, "sem_mudancas": 0}
+    total_mudancas = 0
 
-        result = _diff_section(section, old_text, new_text)
-        changelog.append(result)
+    for adr_id in all_ids:
+        old_adr = old_adrs.get(adr_id)
+        new_adr = new_adrs.get(adr_id)
 
-        if result["possui_mudancas"]:
-            for change in result["mudancas"]:
-                tipo = change["tipo"]
-                changes_by_type[tipo] += 1
-                total_changes += 1
+        old_sections = adr_to_sections(old_adr)
+        new_sections = adr_to_sections(new_adr)
 
-    sections_with_changes = sum(1 for e in changelog if e["possui_mudancas"])
+        secoes = []
+        adr_changes = 0
+        for section in SECTIONS:
+            diff = _diff_section(section, old_sections[section], new_sections[section])
+            secoes.append(diff)
+            if diff["possui_mudancas"]:
+                for change in diff["mudancas"]:
+                    by_type[change["tipo"]] += 1
+                    total_mudancas += 1
+                    adr_changes += 1
+
+        if new_adr and not old_adr:
+            situacao = "adicionada"
+            totais["adicionadas"] += 1
+        elif old_adr and not new_adr:
+            situacao = "removida"
+            totais["removidas"] += 1
+        elif adr_changes > 0:
+            situacao = "modificada"
+            totais["modificadas"] += 1
+        else:
+            situacao = "sem_mudancas"
+            totais["sem_mudancas"] += 1
+
+        titulo = (new_adr or old_adr).get("titulo")
+        adrs_result.append({
+            "id_adr": adr_id,
+            "titulo": titulo,
+            "situacao": situacao,
+            "secoes": secoes,
+        })
+
+    resumo = (
+        f"{totais['modificadas']} ADR(s) modificada(s), "
+        f"{totais['adicionadas']} adicionada(s) e {totais['removidas']} removida(s)"
+    )
 
     result = {
-        "id_adr": adr_id,
+        "documento_antigo": old_pdf_path,
+        "documento_novo": new_pdf_path,
         "gerado_em": datetime.now().isoformat(),
-        "secoes_analisadas": SECTIONS,
-        "changelog": changelog,
-        "resumo": f"{total_changes} mudança(s) detectada(s) em {sections_with_changes} seção(ões)",
-        "total_mudancas": total_changes,
-        "mudancas_por_tipo": changes_by_type,
+        "adrs": adrs_result,
+        "resumo": resumo,
+        "totais": totais,
+        "mudancas_por_tipo": by_type,
+        "total_mudancas": total_mudancas,
     }
 
     result["arquivo_gerado"] = write_changelog_report(result)
