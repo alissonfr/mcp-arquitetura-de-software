@@ -1,5 +1,6 @@
 import os
 import webbrowser
+from pathlib import Path
 from datetime import datetime
 import logging
 
@@ -22,12 +23,6 @@ _SITUATION = {
     "sem_mudancas": ("Sem alterações", "badge-unchanged"),
 }
 
-_CHANGE_TYPE_LABELS = {
-    "adicao": "Adição",
-    "remocao": "Remoção",
-    "modificacao": "Modificação",
-}
-
 
 def _ensure_dir() -> None:
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
@@ -48,8 +43,9 @@ def _write_and_open(filename: str, html_content: str) -> str:
         f.write(html_content)
     logger.info(f"Relatório gravado em: {path}")
 
+    # Path.as_uri() gera um file:// URI válido no Windows e no Linux
     try:
-        webbrowser.open(f"file://{os.path.abspath(path)}")
+        webbrowser.open(Path(path).resolve().as_uri())
         logger.info("Relatório aberto no navegador")
     except Exception as e:
         logger.warning(f"Não foi possível abrir o navegador automaticamente: {e}")
@@ -58,27 +54,27 @@ def _write_and_open(filename: str, html_content: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Ferramenta 1 — Avaliação de Viabilidade
-# A IA devolve dados estruturados (JSON) que renderizamos no template HTML.
+# Tool 1 — Viability assessment
+# The AI returns structured data (JSON) that we render into the HTML template.
 # --------------------------------------------------------------------------- #
 
 def _render_viability_html(data: dict) -> str:
-    melhoria = escape(data.get("melhoria", "N/A"))
+    improvement = escape(data.get("melhoria", "N/A"))
 
     header = (
         '<header class="report-header">'
         "<h1>Avaliação de Viabilidade de Melhoria Futura — SARC</h1>"
-        f'<p class="subtitle">Melhoria avaliada: <strong>{melhoria}</strong></p>'
+        f'<p class="subtitle">Melhoria avaliada: <strong>{improvement}</strong></p>'
         f'<p class="meta">Gerado em {_now_readable()}</p>'
         "</header>"
     )
 
-    resumo = (
+    summary = (
         '<section class="card"><h2>Resumo Executivo</h2>'
         f"<p>{escape(data.get('resumo_executivo', ''))}</p></section>"
     )
 
-    visao = (
+    overview = (
         '<section class="card"><h2>Visão Geral</h2><div class="stats">'
         f'<div class="stat"><span class="stat-num">{data.get("total_adrs_analisadas", 0)}</span>'
         '<span class="stat-label">ADRs analisadas</span></div>'
@@ -91,13 +87,13 @@ def _render_viability_html(data: dict) -> str:
         "</div></section>"
     )
 
-    itens = []
+    items = []
     for adr in data.get("analise", []):
         label, css = _CLASSIFICATION.get(
             adr.get("classificacao", ""),
             (adr.get("classificacao", ""), "badge-unchanged")
         )
-        itens.append(
+        items.append(
             '<div class="adr-item">'
             '<div class="adr-head">'
             f"<h3>{escape(adr.get('id_adr', '?'))}: {escape(adr.get('titulo', ''))}</h3>"
@@ -107,21 +103,21 @@ def _render_viability_html(data: dict) -> str:
             f'<p class="field"><strong>Ação recomendada:</strong> {escape(adr.get("acao_recomendada", ""))}</p>'
             "</div>"
         )
-    analise = '<section class="card"><h2>Análise por ADR</h2>' + "".join(itens) + "</section>"
+    analysis = '<section class="card"><h2>Análise por ADR</h2>' + "".join(items) + "</section>"
 
-    novas = data.get("novas_adrs_sugeridas", [])
-    if novas:
-        blocos = "".join(
+    new_adrs = data.get("novas_adrs_sugeridas", [])
+    if new_adrs:
+        blocks = "".join(
             f'<div class="adr-item"><div class="adr-head"><h3>{escape(n.get("titulo", ""))}</h3>'
             f'<span class="badge badge-added">Nova ADR</span></div>'
             f'<p class="field">{escape(n.get("justificativa", ""))}</p></div>'
-            for n in novas
+            for n in new_adrs
         )
     else:
-        blocos = '<p class="empty">Nenhuma nova ADR é necessária.</p>'
-    novas_html = '<section class="card"><h2>Novas ADRs Sugeridas</h2>' + blocos + "</section>"
+        blocks = '<p class="empty">Nenhuma nova ADR é necessária.</p>'
+    new_adrs_html = '<section class="card"><h2>Novas ADRs Sugeridas</h2>' + blocks + "</section>"
 
-    body = header + resumo + visao + analise + novas_html
+    body = header + summary + overview + analysis + new_adrs_html
     return render_page("Avaliação de Viabilidade — SARC", body)
 
 
@@ -131,32 +127,32 @@ def write_viability_report(data: dict) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Ferramenta 2 — Changelog de ADRs
-# Sem IA: o diff vem como dict estruturado e é renderizado em HTML colorido.
+# Tool 2 — ADR changelog
+# No AI: the diff comes as a structured dict and is rendered as colored HTML.
 # --------------------------------------------------------------------------- #
 
 def _render_diff_change(change: dict) -> str:
-    tipo = change.get("tipo", "")
-    antigo = change.get("conteudo_antigo")
-    novo = change.get("conteudo_novo")
+    change_type = change.get("tipo", "")
+    old = change.get("conteudo_antigo")
+    new = change.get("conteudo_novo")
 
-    if tipo == "adicao":
+    if change_type == "adicao":
         return (
             '<div class="diff diff-added"><span class="diff-label">Adição</span>'
-            f"{nl2br(novo)}</div>"
+            f"{nl2br(new)}</div>"
         )
-    if tipo == "remocao":
+    if change_type == "remocao":
         return (
             '<div class="diff diff-removed"><span class="diff-label">Remoção</span>'
-            f"{nl2br(antigo)}</div>"
+            f"{nl2br(old)}</div>"
         )
-    # modificação: mostra antes (vermelho) e depois (verde) agrupados
+    # modification: show "before" (red) and "after" (green) grouped together
     return (
         '<div class="diff-pair">'
         '<div class="diff diff-removed"><span class="diff-label">Antes</span>'
-        f"{nl2br(antigo)}</div>"
+        f"{nl2br(old)}</div>"
         '<div class="diff diff-added"><span class="diff-label">Depois</span>'
-        f"{nl2br(novo)}</div>"
+        f"{nl2br(new)}</div>"
         "</div>"
     )
 
@@ -172,8 +168,7 @@ def _render_changelog_html(data: dict) -> str:
         "</header>"
     )
 
-    totais = data.get("totais", {})
-    by_type = data.get("mudancas_por_tipo", {})
+    totals = data.get("totais", {})
     summary = (
         '<section class="card">'
         '<div class="legend">'
@@ -183,11 +178,11 @@ def _render_changelog_html(data: dict) -> str:
         "</div>"
         f"<p>{escape(data.get('resumo', ''))}</p>"
         '<div class="stats">'
-        f'<div class="stat stat-revision"><span class="stat-num">{totais.get("modificadas", 0)}</span>'
+        f'<div class="stat stat-revision"><span class="stat-num">{totals.get("modificadas", 0)}</span>'
         '<span class="stat-label">ADRs modificadas</span></div>'
-        f'<div class="stat stat-valid"><span class="stat-num">{totais.get("adicionadas", 0)}</span>'
+        f'<div class="stat stat-valid"><span class="stat-num">{totals.get("adicionadas", 0)}</span>'
         '<span class="stat-label">ADRs adicionadas</span></div>'
-        f'<div class="stat stat-obsolete"><span class="stat-num">{totais.get("removidas", 0)}</span>'
+        f'<div class="stat stat-obsolete"><span class="stat-num">{totals.get("removidas", 0)}</span>'
         '<span class="stat-label">ADRs removidas</span></div>'
         f'<div class="stat"><span class="stat-num">{data.get("total_mudancas", 0)}</span>'
         '<span class="stat-label">Mudanças totais</span></div>'
@@ -197,19 +192,19 @@ def _render_changelog_html(data: dict) -> str:
     cards = []
     unchanged = []
     for adr in data.get("adrs", []):
-        situacao = adr.get("situacao", "sem_mudancas")
-        if situacao == "sem_mudancas":
+        situation = adr.get("situacao", "sem_mudancas")
+        if situation == "sem_mudancas":
             unchanged.append(adr.get("id_adr", "?"))
             continue
 
-        label, css = _SITUATION.get(situacao, (situacao, "badge-unchanged"))
-        secoes_html = []
-        for secao in adr.get("secoes", []):
-            if not secao.get("possui_mudancas"):
+        label, css = _SITUATION.get(situation, (situation, "badge-unchanged"))
+        sections_html = []
+        for section in adr.get("secoes", []):
+            if not section.get("possui_mudancas"):
                 continue
-            mudancas = "".join(_render_diff_change(c) for c in secao.get("mudancas", []))
-            secoes_html.append(
-                f'<div class="section-title">{escape(secao.get("secao", ""))}</div>{mudancas}'
+            changes = "".join(_render_diff_change(c) for c in section.get("mudancas", []))
+            sections_html.append(
+                f'<div class="section-title">{escape(section.get("secao", ""))}</div>{changes}'
             )
 
         cards.append(
@@ -218,7 +213,7 @@ def _render_changelog_html(data: dict) -> str:
             f"<h2>{escape(adr.get('id_adr', '?'))}: {escape(adr.get('titulo', ''))}</h2>"
             f'<span class="badge {css}">{escape(label)}</span>'
             "</div>"
-            + ("".join(secoes_html) or '<p class="empty">Sem detalhes de seção.</p>')
+            + ("".join(sections_html) or '<p class="empty">Sem detalhes de seção.</p>')
             + "</section>"
         )
 

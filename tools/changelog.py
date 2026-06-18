@@ -1,4 +1,5 @@
 import difflib
+import os
 import re
 import logging
 from datetime import datetime
@@ -22,7 +23,7 @@ def _diff_section(section_name: str, old_text: str, new_text: str) -> dict:
 
     matcher = difflib.SequenceMatcher(None, old_lines, new_lines, autojunk=False)
 
-    mudancas = []
+    changes = []
     for opcode, i1, i2, j1, j2 in matcher.get_opcodes():
         if opcode == "equal":
             continue
@@ -31,23 +32,30 @@ def _diff_section(section_name: str, old_text: str, new_text: str) -> dict:
         new_chunk = "".join(new_lines[j1:j2]).strip() or None
 
         if opcode == "insert":
-            tipo = "adicao"
+            change_type = "adicao"
         elif opcode == "delete":
-            tipo = "remocao"
+            change_type = "remocao"
         else:  # replace
-            tipo = "modificacao"
+            change_type = "modificacao"
 
-        mudancas.append({
-            "tipo": tipo,
+        changes.append({
+            "tipo": change_type,
             "conteudo_antigo": old_chunk,
             "conteudo_novo": new_chunk,
         })
 
-    return {"secao": section_name, "possui_mudancas": True, "mudancas": mudancas}
+    return {"secao": section_name, "possui_mudancas": True, "mudancas": changes}
 
 
 def run_changelog_generation(old_pdf_path: str, new_pdf_path: str) -> dict:
     logger.info(f"Iniciando changelog entre '{old_pdf_path}' e '{new_pdf_path}'")
+
+    for path in (old_pdf_path, new_pdf_path):
+        if not os.path.isfile(path):
+            return {
+                "erro": f"Arquivo não encontrado: {path}",
+                "dica": "Verifique o caminho informado (sem aspas) e a extensão .pdf."
+            }
 
     old_adrs = parse_all_adrs(convert_pdf_to_markdown(old_pdf_path))
     new_adrs = parse_all_adrs(convert_pdf_to_markdown(new_pdf_path))
@@ -62,8 +70,8 @@ def run_changelog_generation(old_pdf_path: str, new_pdf_path: str) -> dict:
 
     adrs_result = []
     by_type = {"adicao": 0, "remocao": 0, "modificacao": 0}
-    totais = {"modificadas": 0, "adicionadas": 0, "removidas": 0, "sem_mudancas": 0}
-    total_mudancas = 0
+    totals = {"modificadas": 0, "adicionadas": 0, "removidas": 0, "sem_mudancas": 0}
+    total_changes = 0
 
     for adr_id in all_ids:
         old_adr = old_adrs.get(adr_id)
@@ -72,41 +80,41 @@ def run_changelog_generation(old_pdf_path: str, new_pdf_path: str) -> dict:
         old_sections = adr_to_sections(old_adr)
         new_sections = adr_to_sections(new_adr)
 
-        secoes = []
-        adr_changes = 0
+        sections = []
+        adr_change_count = 0
         for section in SECTIONS:
             diff = _diff_section(section, old_sections[section], new_sections[section])
-            secoes.append(diff)
+            sections.append(diff)
             if diff["possui_mudancas"]:
                 for change in diff["mudancas"]:
                     by_type[change["tipo"]] += 1
-                    total_mudancas += 1
-                    adr_changes += 1
+                    total_changes += 1
+                    adr_change_count += 1
 
         if new_adr and not old_adr:
-            situacao = "adicionada"
-            totais["adicionadas"] += 1
+            situation = "adicionada"
+            totals["adicionadas"] += 1
         elif old_adr and not new_adr:
-            situacao = "removida"
-            totais["removidas"] += 1
-        elif adr_changes > 0:
-            situacao = "modificada"
-            totais["modificadas"] += 1
+            situation = "removida"
+            totals["removidas"] += 1
+        elif adr_change_count > 0:
+            situation = "modificada"
+            totals["modificadas"] += 1
         else:
-            situacao = "sem_mudancas"
-            totais["sem_mudancas"] += 1
+            situation = "sem_mudancas"
+            totals["sem_mudancas"] += 1
 
-        titulo = (new_adr or old_adr).get("titulo")
+        title = (new_adr or old_adr).get("title")
         adrs_result.append({
             "id_adr": adr_id,
-            "titulo": titulo,
-            "situacao": situacao,
-            "secoes": secoes,
+            "titulo": title,
+            "situacao": situation,
+            "secoes": sections,
         })
 
-    resumo = (
-        f"{totais['modificadas']} ADR(s) modificada(s), "
-        f"{totais['adicionadas']} adicionada(s) e {totais['removidas']} removida(s)"
+    summary = (
+        f"{totals['modificadas']} ADR(s) modificada(s), "
+        f"{totals['adicionadas']} adicionada(s) e {totals['removidas']} removida(s)"
     )
 
     result = {
@@ -114,10 +122,10 @@ def run_changelog_generation(old_pdf_path: str, new_pdf_path: str) -> dict:
         "documento_novo": new_pdf_path,
         "gerado_em": datetime.now().isoformat(),
         "adrs": adrs_result,
-        "resumo": resumo,
-        "totais": totais,
+        "resumo": summary,
+        "totais": totals,
         "mudancas_por_tipo": by_type,
-        "total_mudancas": total_mudancas,
+        "total_mudancas": total_changes,
     }
 
     result["arquivo_gerado"] = write_changelog_report(result)

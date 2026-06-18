@@ -1,4 +1,5 @@
 from openai import OpenAI
+import os
 import logging
 
 from core import convert_pdf_to_markdown, parse_all_adrs, assess_viability, write_viability_report
@@ -8,6 +9,12 @@ logger = logging.getLogger(__name__)
 
 def run_viability_assessment(client: OpenAI, improvement: str, pdf_path: str) -> dict:
     logger.info(f"Iniciando avaliação de viabilidade para: {improvement}")
+
+    if not os.path.isfile(pdf_path):
+        return {
+            "erro": f"Arquivo não encontrado: {pdf_path}",
+            "dica": "Verifique o caminho informado (sem aspas) e a extensão .pdf."
+        }
 
     md_text = convert_pdf_to_markdown(pdf_path)
     adrs = parse_all_adrs(md_text)

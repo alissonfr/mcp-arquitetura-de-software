@@ -3,10 +3,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Section names as they appear in the document and in the tool output (kept pt-BR).
 SECTIONS = ["Contexto", "Decisão", "Status", "Consequências"]
 
-# Cabeçalho de seção em qualquer formato: **Contexto:** | Contexto: | Contexto
-# `name` é um fragmento de regex cru (ex.: "Decis[aã]o"), então NÃO pode ser escapado.
+# Section header in any format: **Contexto:** | Contexto: | Contexto
+# `name` is a raw regex fragment (e.g. "Decis[aã]o"), so it must NOT be escaped.
 _HDR = r"(?:\*\*)?{name}:?(?:\*\*)?\s*"
 
 
@@ -15,7 +16,7 @@ def _hdr(name: str) -> str:
 
 
 def parse_all_adrs(md_text: str) -> dict[str, dict]:
-    # Divide o texto antes de cada cabeçalho de ADR: "4.1. ADR-01:", "## ADR-01:" ou "ADR-01:"
+    # Split the text before each ADR header: "4.1. ADR-01:", "## ADR-01:" or "ADR-01:"
     blocks = re.split(
         r"(?=(?:#{1,6}\s+)?(?:\d+\.\d+[\.\s]+)?ADR-\d+[:\s])",
         md_text
@@ -40,29 +41,29 @@ def _parse_single_adr(block: str) -> dict:
 
     adr_id = id_match.group(1).strip()
 
-    # Título: texto na mesma linha após "ADR-XX:"
+    # Title: text on the same line after "ADR-XX:"
     title_match = re.search(r"ADR-\d+[:\s]+(.+?)(?:\n|$)", block)
 
-    # Contexto: até o cabeçalho Decisão (ou fim do bloco)
+    # Context: up to the "Decisão" header (or end of block)
     context_match = re.search(
         _hdr("Contexto") + r"(.*?)(?=" + _hdr("Decis[aã]o") + r"|\Z)",
         block, re.DOTALL | re.IGNORECASE
     )
 
-    # Decisão: até Status ou Consequências (ou fim do bloco)
+    # Decision: up to "Status" or "Consequências" (or end of block)
     decision_match = re.search(
         _hdr("Decis[aã]o") + r"(.*?)(?="
         + _hdr("Status") + r"|" + _hdr("Consequ[eê]ncias") + r"|\Z)",
         block, re.DOTALL | re.IGNORECASE
     )
 
-    # Status: opcional (ausente no documento do SARC), só até o fim da linha
+    # Status: optional (absent in the SARC document), only to end of line
     status_match = re.search(
         _hdr("Status") + r"(.+?)(?=\n|$)",
         block, re.IGNORECASE
     )
 
-    # Consequências: até o fim do bloco
+    # Consequences: to the end of the block
     consequences_match = re.search(
         _hdr("Consequ[eê]ncias") + r"(.*?)(?=\Z)",
         block, re.DOTALL | re.IGNORECASE
@@ -70,24 +71,24 @@ def _parse_single_adr(block: str) -> dict:
 
     return {
         "id": adr_id,
-        "titulo": title_match.group(1).strip() if title_match else None,
-        "contexto": context_match.group(1).strip() if context_match else None,
-        "decisao": decision_match.group(1).strip() if decision_match else None,
+        "title": title_match.group(1).strip() if title_match else None,
+        "context": context_match.group(1).strip() if context_match else None,
+        "decision": decision_match.group(1).strip() if decision_match else None,
         "status": status_match.group(1).strip() if status_match else None,
-        "consequencias": consequences_match.group(1).strip() if consequences_match else None,
+        "consequences": consequences_match.group(1).strip() if consequences_match else None,
     }
 
 
 def adr_to_sections(adr: dict | None) -> dict[str, str]:
-    # Converte um ADR já parseado em {Contexto, Decisão, Status, Consequências};
-    # ADR ausente (None) vira seções vazias — usado no diff do changelog.
+    # Convert a parsed ADR into {Contexto, Decisão, Status, Consequências};
+    # a missing ADR (None) becomes empty sections — used by the changelog diff.
     if not adr:
         return {section: "" for section in SECTIONS}
     return {
-        "Contexto": adr.get("contexto") or "",
-        "Decisão": adr.get("decisao") or "",
+        "Contexto": adr.get("context") or "",
+        "Decisão": adr.get("decision") or "",
         "Status": adr.get("status") or "",
-        "Consequências": adr.get("consequencias") or "",
+        "Consequências": adr.get("consequences") or "",
     }
 
 
@@ -95,10 +96,10 @@ def format_adrs_for_prompt(adrs: dict) -> str:
     parts = []
     for adr in adrs.values():
         part = (
-            f"### {adr['id']}: {adr['titulo']}\n\n"
-            f"**Contexto:** {adr.get('contexto') or 'N/A'}\n\n"
-            f"**Decisão:** {adr.get('decisao') or 'N/A'}\n\n"
-            f"**Consequências:**\n{adr.get('consequencias') or 'N/A'}"
+            f"### {adr['id']}: {adr['title']}\n\n"
+            f"**Contexto:** {adr.get('context') or 'N/A'}\n\n"
+            f"**Decisão:** {adr.get('decision') or 'N/A'}\n\n"
+            f"**Consequências:**\n{adr.get('consequences') or 'N/A'}"
         )
         parts.append(part)
     return "\n\n---\n\n".join(parts)

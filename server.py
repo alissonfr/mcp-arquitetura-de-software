@@ -78,7 +78,7 @@ def generate_adr_changelog(old_pdf_path: str, new_pdf_path: str) -> dict:
 
 if __name__ == "__main__":
     try:
-        logger.info(f"Iniciando servidor MCP: {SERVER_NAME}")
+        logger.info(f"🚀 Servidor MCP iniciado: {SERVER_NAME}")
         mcp.run()
     except Exception as e:
         logger.error(f"Erro ao iniciar servidor: {e}")
