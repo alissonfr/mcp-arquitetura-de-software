@@ -166,7 +166,7 @@ async def _run_viability_agent(ai_client: OpenAI, mcp_session, improvement: str)
             messages.append(choice.message)
 
             for tool_call in choice.message.tool_calls:
-                logger.info(f"chamando ferramenta: {tool_call.function.name}")
+                logger.info(f"Chamando ferramenta: {tool_call.function.name}")
 
                 tool_result = await mcp_session.call_tool(
                     name=tool_call.function.name,
@@ -178,7 +178,7 @@ async def _run_viability_agent(ai_client: OpenAI, mcp_session, improvement: str)
                     generated_file = parsed["arquivo_gerado"]
 
                 result_text = str(tool_result.content)
-                logger.info(f"resultado recebido ({len(result_text)} chars)")
+                logger.info(f"Resultado recebido ({len(result_text)} chars)")
 
                 messages.append({
                     "role": "tool",
@@ -191,7 +191,7 @@ async def _run_viability_agent(ai_client: OpenAI, mcp_session, improvement: str)
 async def _run_changelog_direct(mcp_session) -> None:
     """Ferramenta 2: chamada direta — sem IA, resultado puro do difflib."""
     print("\n[exemplo] comparando ADR-07 antes e depois da melhoria de backup em nuvem\n")
-    logger.info("chamando ferramenta: gerar_changelog_adr")
+    logger.info("Chamando ferramenta: gerar_changelog_adr")
 
     result = await mcp_session.call_tool(
         name="gerar_changelog_adr",

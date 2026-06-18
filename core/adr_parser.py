@@ -5,10 +5,8 @@ logger = logging.getLogger(__name__)
 
 SECTIONS = ["Contexto", "Decisão", "Status", "Consequências"]
 
-# Matches a section header in either format:
-#   **Contexto:**  or  Contexto:  or  Contexto
-# `name` is a raw regex fragment (e.g. "Decis[aã]o" to tolerate accents),
-# so it must NOT be escaped — escaping would turn the char class into literals.
+# Cabeçalho de seção em qualquer formato: **Contexto:** | Contexto: | Contexto
+# `name` é um fragmento de regex cru (ex.: "Decis[aã]o"), então NÃO pode ser escapado.
 _HDR = r"(?:\*\*)?{name}:?(?:\*\*)?\s*"
 
 
@@ -17,10 +15,7 @@ def _hdr(name: str) -> str:
 
 
 def parse_all_adrs(md_text: str) -> dict[str, dict]:
-    # Split on every ADR header regardless of prefix style:
-    #   "4.1. ADR-01: Title"  (SARC LaTeX PDF via markitdown)
-    #   "## ADR-01: Title"    (professor's markdown file)
-    #   "ADR-01: Title"       (bare)
+    # Divide o texto antes de cada cabeçalho de ADR: "4.1. ADR-01:", "## ADR-01:" ou "ADR-01:"
     blocks = re.split(
         r"(?=(?:#{1,6}\s+)?(?:\d+\.\d+[\.\s]+)?ADR-\d+[:\s])",
         md_text
@@ -34,7 +29,7 @@ def parse_all_adrs(md_text: str) -> dict[str, dict]:
         if adr and adr.get("id"):
             adrs[adr["id"]] = adr
 
-    logger.info(f"{len(adrs)} ADR(s) extraída(s) do documento")
+    logger.info(f"Extraída(s) {len(adrs)} ADR(s) do documento")
     return adrs
 
 
@@ -45,29 +40,29 @@ def _parse_single_adr(block: str) -> dict:
 
     adr_id = id_match.group(1).strip()
 
-    # Title: text on same line after "ADR-XX:" or "ADR-XX "
+    # Título: texto na mesma linha após "ADR-XX:"
     title_match = re.search(r"ADR-\d+[:\s]+(.+?)(?:\n|$)", block)
 
-    # Context → ends at Decisão (or EOF)
+    # Contexto: até o cabeçalho Decisão (ou fim do bloco)
     context_match = re.search(
         _hdr("Contexto") + r"(.*?)(?=" + _hdr("Decis[aã]o") + r"|\Z)",
         block, re.DOTALL | re.IGNORECASE
     )
 
-    # Decision → ends at Status or Consequências (or EOF)
+    # Decisão: até Status ou Consequências (ou fim do bloco)
     decision_match = re.search(
         _hdr("Decis[aã]o") + r"(.*?)(?="
         + _hdr("Status") + r"|" + _hdr("Consequ[eê]ncias") + r"|\Z)",
         block, re.DOTALL | re.IGNORECASE
     )
 
-    # Status is optional (not present in SARC document)
+    # Status: opcional (ausente no documento do SARC), só até o fim da linha
     status_match = re.search(
         _hdr("Status") + r"(.+?)(?=\n|$)",
         block, re.IGNORECASE
     )
 
-    # Consequences → to end of block
+    # Consequências: até o fim do bloco
     consequences_match = re.search(
         _hdr("Consequ[eê]ncias") + r"(.*?)(?=\Z)",
         block, re.DOTALL | re.IGNORECASE

@@ -3,9 +3,8 @@ from dotenv import load_dotenv
 import os
 import logging
 
-from core import llm as llm_module
-from tools.viability import run_viability_assessment
-from tools.changelog import run_changelog_generation
+from core import connect
+from tools import run_viability_assessment, run_changelog_generation
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,7 +36,7 @@ def get_client():
     global _client
     if _client is None:
         api_key = os.getenv("OPENAI_API_KEY")
-        _client = llm_module.connect(api_key)
+        _client = connect(api_key)
     return _client
 
 
@@ -78,9 +77,9 @@ def generate_adr_changelog(old_version: str, new_version: str) -> dict:
 
 if __name__ == "__main__":
     try:
-        logger.info(f"iniciando servidor MCP: {SERVER_NAME}")
-        logger.info(f"documento de arquitetura: {ARCHITECTURE_FILE}")
+        logger.info(f"Iniciando servidor MCP: {SERVER_NAME}")
+        logger.info(f"Documento de arquitetura: {ARCHITECTURE_FILE}")
         mcp.run()
     except Exception as e:
-        logger.error(f"erro ao iniciar servidor: {e}")
+        logger.error(f"Erro ao iniciar servidor: {e}")
         raise

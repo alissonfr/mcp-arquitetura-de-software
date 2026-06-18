@@ -1,10 +1,9 @@
 import difflib
 import re
+import logging
 from datetime import datetime
 
-from core.adr_parser import parse_adr_sections, SECTIONS
-from core.report_writer import write_changelog_report
-import logging
+from core import parse_adr_sections, SECTIONS, write_changelog_report
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,7 @@ def _diff_section(section_name: str, old_text: str, new_text: str) -> dict:
 
 
 def run_changelog_generation(old_version: str, new_version: str) -> dict:
-    logger.info("iniciando geração de changelog de ADR")
+    logger.info("Iniciando geração de changelog de ADR")
 
     old_sections = parse_adr_sections(old_version)
     new_sections = parse_adr_sections(new_version)
