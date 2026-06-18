@@ -18,71 +18,71 @@ def assess_viability(client: OpenAI, improvement: str, adrs: dict) -> str:
     generated_at = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
     prompt = f"""
-Você é um arquiteto de software sênior especializado em Architecture Decision Records (ADRs)
-e arquitetura evolutiva.
+        Você é um arquiteto de software sênior especializado em Architecture Decision Records (ADRs)
+        e arquitetura evolutiva.
 
-## Tarefa
-Analise o impacto da seguinte melhoria futura proposta sobre as ADRs existentes do
-sistema SARC (Sistema de Auxílio para Representantes Comerciais):
+        ## Tarefa
+        Analise o impacto da seguinte melhoria futura proposta sobre as ADRs existentes do
+        sistema SARC (Sistema de Auxílio para Representantes Comerciais):
 
-**Melhoria Proposta:** {improvement}
+        **Melhoria Proposta:** {improvement}
 
-## ADRs do Sistema SARC
-{formatted_adrs}
+        ## ADRs do Sistema SARC
+        {formatted_adrs}
 
-## Instruções de Análise
-Para CADA ADR listada acima:
-1. Considere seu Contexto, Decisão, Status e Consequências
-2. Raciocine sobre como "{improvement}" interage com a ADR
-3. Classifique usando exatamente um destes rótulos: "Precisa de revisão",
-   "Continua válida" ou "Pode se tornar obsoleta"
-4. Escreva uma justificativa concisa (2-3 frases)
-5. Escreva uma ação recomendada (1-2 frases)
+        ## Instruções de Análise
+        Para CADA ADR listada acima:
+        1. Considere seu Contexto, Decisão, Status e Consequências
+        2. Raciocine sobre como "{improvement}" interage com a ADR
+        3. Classifique usando exatamente um destes rótulos: "Precisa de revisão",
+        "Continua válida" ou "Pode se tornar obsoleta"
+        4. Escreva uma justificativa concisa (2-3 frases)
+        5. Escreva uma ação recomendada (1-2 frases)
 
-Identifique também quaisquer novas ADRs que precisariam ser criadas para suportar a melhoria.
+        Identifique também quaisquer novas ADRs que precisariam ser criadas para suportar a melhoria.
 
-## Formato de Saída
-Retorne APENAS um documento Markdown seguindo EXATAMENTE este modelo, sem blocos de código
-e sem nenhum texto fora do modelo:
+        ## Formato de Saída
+        Retorne APENAS um documento Markdown seguindo EXATAMENTE este modelo, sem blocos de código
+        e sem nenhum texto fora do modelo:
 
-# Avaliação de Viabilidade de Melhoria Futura — SARC
+        # Avaliação de Viabilidade de Melhoria Futura — SARC
 
-**Melhoria avaliada:** {improvement}
-**Gerado em:** {generated_at}
+        **Melhoria avaliada:** {improvement}
+        **Gerado em:** {generated_at}
 
-## Resumo Executivo
+        ## Resumo Executivo
 
-<resumo de 3-5 frases sobre o impacto geral da melhoria nas ADRs>
+        <resumo de 3-5 frases sobre o impacto geral da melhoria nas ADRs>
 
-## Visão Geral
+        ## Visão Geral
 
-| Métrica | Valor |
-|---------|-------|
-| Total de ADRs analisadas | <inteiro> |
-| Precisam de revisão | <inteiro> |
-| Continuam válidas | <inteiro> |
-| Podem se tornar obsoletas | <inteiro> |
+        | Métrica | Valor |
+        |---------|-------|
+        | Total de ADRs analisadas | <inteiro> |
+        | Precisam de revisão | <inteiro> |
+        | Continuam válidas | <inteiro> |
+        | Podem se tornar obsoletas | <inteiro> |
 
-## Análise por ADR
+        ## Análise por ADR
 
-### ADR-XX: <título da ADR>
+        ### ADR-XX: <título da ADR>
 
-**Classificação:** <Precisa de revisão | Continua válida | Pode se tornar obsoleta>
+        **Classificação:** <Precisa de revisão | Continua válida | Pode se tornar obsoleta>
 
-**Justificativa:** <justificativa em 2-3 frases>
+        **Justificativa:** <justificativa em 2-3 frases>
 
-**Ação recomendada:** <ação em 1-2 frases>
+        **Ação recomendada:** <ação em 1-2 frases>
 
-(repita o bloco "### ADR-XX" para cada ADR analisada)
+        (repita o bloco "### ADR-XX" para cada ADR analisada)
 
-## Novas ADRs Sugeridas
+        ## Novas ADRs Sugeridas
 
-### <título da nova ADR>
+        ### <título da nova ADR>
 
-<justificativa de por que esta nova ADR é necessária>
+        <justificativa de por que esta nova ADR é necessária>
 
-(repita para cada nova ADR; se nenhuma for necessária, escreva apenas: "Nenhuma nova ADR é necessária.")
-"""
+        (repita para cada nova ADR; se nenhuma for necessária, escreva apenas: "Nenhuma nova ADR é necessária.")
+    """
 
     logger.info(f"Chamando IA para avaliar viabilidade: {improvement[:50]}...")
     response = client.chat.completions.create(
